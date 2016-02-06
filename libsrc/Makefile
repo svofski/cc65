@@ -14,7 +14,7 @@ CBMS = c128   \
 GEOS = geos-apple \
        geos-cbm
 
-TARGETS = apple2    \
+TARGETS ?= apple2    \
           apple2enh \
           atari     \
           atarixl   \
@@ -28,7 +28,8 @@ TARGETS = apple2    \
           pce       \
           sim6502   \
           sim65c02  \
-          supervision
+          supervision \
+          vector 
 
 DRVTYPES = emd \
            joy \
@@ -123,7 +124,8 @@ EXTZP = cbm510 \
 MKINC = $(GEOS) \
         atari   \
         atarixl \
-        nes
+        nes \
+	vector
 
 TARGETUTIL = apple2    \
              apple2enh \
@@ -257,17 +259,20 @@ export CC65_HOME := $(abspath ..)
 define ASSEMBLE_recipe
 
 $(if $(QUIET),,@echo $(TARGET) - $<)
-@$(CA65) -t $(TARGET) $(CA65FLAGS) --create-dep $(@:.o=.d) -o $@ $<
+@$(CA65) -t $(_TARGET) $(CA65FLAGS) --create-dep $(@:.o=.d) -o $@ $<
 
 endef # ASSEMBLE_recipe
 
 define COMPILE_recipe
-
 $(if $(QUIET),,@echo $(TARGET) - $<)
-@$(CC65) -t $(TARGET) $(CC65FLAGS) --create-dep $(@:.o=.d) --dep-target $@ -o $(@:.o=.s) $<
-@$(CA65) -t $(TARGET) -o $@ $(@:.o=.s)
-
+$(CC65) -t $(_TARGET) $(CC65FLAGS) --create-dep $(@:.o=.d) --dep-target $@ -o $(@:.o=.s) $<
+$(CA65) -t $(_TARGET) -o $@ $(@:.o=.s)
 endef # COMPILE_recipe
+
+#ifeq ($(TARGET),$(filter $(TARGET),$(MKINC)))
+#  include $(SRCDIR)/Override.inc
+#endif
+
 
 ../libwrk/$(TARGET)/%.o: %.s | ../libwrk/$(TARGET)
 	$(ASSEMBLE_recipe)
@@ -276,14 +281,14 @@ endef # COMPILE_recipe
 	$(COMPILE_recipe)
 
 $(EXTRA_OBJPAT): $(EXTRA_SRCPAT) | ../lib
-	@echo $(TARGET) - $(<F)
-	@$(CA65) -t $(TARGET) $(CA65FLAGS) -o $@ $<
+	echo $(TARGET) - $(<F)
+	$(CA65) -t $(TARGET) $(CA65FLAGS) -o $@ $<
 
 ../lib/$(TARGET).lib: $(OBJS) | ../lib
 	$(AR65) a $@ $?
 
 ../libwrk/$(TARGET) ../lib ../targetutil:
-	@$(call MKDIR,$@)
+	$(call MKDIR,$@)
 
 $(TARGET): $(EXTRA_OBJS) ../lib/$(TARGET).lib
 
