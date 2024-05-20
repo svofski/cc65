@@ -55,6 +55,7 @@
 #include "data.h"
 #include "error.h"
 #include "global.h"
+#include "handler.h"
 #include "infofile.h"
 #include "labels.h"
 #include "opctable.h"
@@ -62,6 +63,8 @@
 #include "scanner.h"
 #include "segment.h"
 
+
+static unsigned PrevAddrMode;
 
 
 /*****************************************************************************/
@@ -82,6 +85,7 @@ static void Usage (void)
             "  -v\t\t\tIncrease verbosity\n"
             "  -F\t\t\tAdd formfeeds to the output\n"
             "  -S addr\t\tSet the start/load address\n"
+            "  -s\t\t\tAccept line markers in the info file\n"
             "  -V\t\t\tPrint the disassembler version\n"
             "\n"
             "Long options:\n"
@@ -98,6 +102,7 @@ static void Usage (void)
             "  --mnemonic-column n\tSpecify mnemonic start column\n"
             "  --pagelength n\tSet the page length for the listing\n"
             "  --start-addr addr\tSet the start/load address\n"
+            "  --sync-lines\t\tAccept line markers in the info file\n"
             "  --text-column n\tSpecify text start column\n"
             "  --verbose\t\tIncrease verbosity\n"
             "  --version\t\tPrint the disassembler version\n",
@@ -312,6 +317,15 @@ static void OptStartAddr (const char* Opt, const char* Arg)
 
 
 
+static void OptSyncLines (const char* Opt attribute ((unused)),
+                          const char* Arg attribute ((unused)))
+/* Handle the --sync-lines option */
+{
+    SyncLines = 1;
+}
+
+
+
 static void OptTextColumn (const char* Opt, const char* Arg)
 /* Handle the --text-column option */
 {
@@ -340,7 +354,8 @@ static void OptVersion (const char* Opt attribute ((unused)),
                         const char* Arg attribute ((unused)))
 /* Print the disassembler version */
 {
-    fprintf (stderr, "da65 V%s\n", GetVersionAsString ());
+    fprintf (stderr, "%s V%s\n", ProgName, GetVersionAsString ());
+    exit(EXIT_SUCCESS);
 }
 
 
@@ -349,6 +364,7 @@ static void OneOpcode (unsigned RemainingBytes)
 /* Disassemble one opcode */
 {
     unsigned I;
+    unsigned OldPC = PC;
 
     /* Get the opcode from the current address */
     unsigned char OPC = GetCodeByte (PC);
@@ -414,8 +430,13 @@ static void OneOpcode (unsigned RemainingBytes)
     switch (Style) {
 
         case atDefault:
-            D->Handler (D);
-            PC += D->Size;
+            if (CPU == CPU_65816) {
+                DataByteLine (1);
+                ++PC;
+            } else {
+                D->Handler (D);
+                PC += D->Size;
+            }
             break;
 
         case atCode:
@@ -423,12 +444,36 @@ static void OneOpcode (unsigned RemainingBytes)
             ** following insn, fall through to byte mode.
             */
             if (D->Size <= RemainingBytes) {
+                if (CPU == CPU_65816) {
+                    const unsigned AddrMode = GetAttr (PC) & at65816Mask;
+                    if (PrevAddrMode != AddrMode) {
+                        if ((PrevAddrMode & atMem8) != (AddrMode & atMem8) ||
+                            (PrevAddrMode & atMem16) != (AddrMode & atMem16)) {
+                            OutputMFlag(!!(AddrMode & atMem8));
+                        }
+                        if ((PrevAddrMode & atIdx8) != (AddrMode & atIdx8) ||
+                            (PrevAddrMode & atIdx16) != (AddrMode & atIdx16)) {
+                            OutputXFlag(!!(AddrMode & atIdx8));
+                        }
+
+                        PrevAddrMode = AddrMode;
+                    }
+                }
+
                 /* Output labels within the next insn */
                 for (I = 1; I < D->Size; ++I) {
                     ForwardLabel (I);
                 }
                 /* Output the insn */
                 D->Handler (D);
+                if (CPU == CPU_65816 && (D->Flags & flSizeChanges)) {
+                    if ((D->Handler == OH_Immediate65816M &&
+                        GetAttr (PC) & atMem16) ||
+                        (D->Handler == OH_Immediate65816X &&
+                        GetAttr (PC) & atIdx16)) {
+                        PC++;
+                    }
+                }
                 PC += D->Size;
                 break;
             }
@@ -475,7 +520,7 @@ static void OneOpcode (unsigned RemainingBytes)
     /* Change back to the default CODE segment if
     ** a named segment stops at the current address.
     */
-    for (I = D->Size; I >= 1; --I) {
+    for (I = PC - OldPC; I > 0; --I) {
         if (IsSegmentEnd (PC - I)) {
             EndSegment ();
             break;
@@ -489,6 +534,8 @@ static void OnePass (void)
 /* Make one pass through the code */
 {
     unsigned Count;
+
+    PrevAddrMode = 0;
 
     /* Disassemble until nothing left */
     while ((Count = GetRemainingBytes()) > 0) {
@@ -537,6 +584,7 @@ int main (int argc, char* argv [])
         { "--mnemonic-column",  1,      OptMnemonicColumn       },
         { "--pagelength",       1,      OptPageLength           },
         { "--start-addr",       1,      OptStartAddr            },
+        { "--sync-lines",       0,      OptSyncLines            },
         { "--text-column",      1,      OptTextColumn           },
         { "--verbose",          0,      OptVerbose              },
         { "--version",          0,      OptVersion              },
@@ -587,6 +635,10 @@ int main (int argc, char* argv [])
                     OptStartAddr (Arg, GetArg (&I, 2));
                     break;
 
+                case 's':
+                    OptSyncLines (Arg, 0);
+                    break;
+
                 case 'V':
                     OptVersion (Arg, 0);
                     break;
@@ -599,7 +651,7 @@ int main (int argc, char* argv [])
         } else {
             /* Filename. Check if we already had one */
             if (InFile) {
-                fprintf (stderr, "%s: Don't know what to do with `%s'\n",
+                fprintf (stderr, "%s: Don't know what to do with '%s'\n",
                          ProgName, Arg);
                 exit (EXIT_FAILURE);
             } else {

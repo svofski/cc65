@@ -123,7 +123,6 @@ static void Usage (void)
             "  --large-alignment\t\tDon't warn about large alignments\n"
             "  --listing name\t\tCreate a listing file if assembly was ok\n"
             "  --list-bytes n\t\tMaximum number of bytes per listing line\n"
-            "  --macpack-dir dir\t\tSet a macro package directory\n"
             "  --memory-model model\t\tSet the memory model\n"
             "  --pagelength n\t\tSet the page length for the listing\n"
             "  --relax-checks\t\tRelax some checks (see docs)\n"
@@ -169,7 +168,7 @@ static void NewSymbol (const char* SymName, long Val)
 
     /* Check if have already a symbol with this name */
     if (SymIsDef (Sym)) {
-        AbEnd ("`%s' is already defined", SymName);
+        AbEnd ("'%s' is already defined", SymName);
     }
 
     /* Generate an expression for the symbol */
@@ -202,11 +201,19 @@ static void SetSys (const char* Sys)
             break;
 
         case TGT_MODULE:
-            AbEnd ("Cannot use `module' as a target for the assembler");
+            AbEnd ("Cannot use 'module' as a target for the assembler");
+            break;
+
+        case TGT_ATARI2600:
+            NewSymbol ("__ATARI2600__", 1);
             break;
 
         case TGT_ATARI5200:
             NewSymbol ("__ATARI5200__", 1);
+            break;
+
+        case TGT_ATARI7800:
+            NewSymbol ("__ATARI7800__", 1);
             break;
 
         case TGT_ATARI:
@@ -224,6 +231,10 @@ static void SetSys (const char* Sys)
 
         case TGT_C64:
             CBMSystem ("__C64__");
+            break;
+
+        case TGT_C65:
+            CBMSystem ("__C65__");
             break;
 
         case TGT_VIC20:
@@ -264,10 +275,18 @@ static void SetSys (const char* Sys)
             NewSymbol ("__APPLE2ENH__", 1);
             break;
 
+        case TGT_GAMATE:
+            NewSymbol ("__GAMATE__", 1);
+            break;
+
         case TGT_GEOS_CBM:
             /* Do not handle as a CBM system */
             NewSymbol ("__GEOS__", 1);
             NewSymbol ("__GEOS_CBM__", 1);
+            break;
+
+        case TGT_CREATIVISION:
+            NewSymbol ("__CREATIVISION__", 1);
             break;
 
         case TGT_GEOS_APPLE:
@@ -282,6 +301,10 @@ static void SetSys (const char* Sys)
         case TGT_ATMOS:
             NewSymbol ("__ATMOS__", 1);
             break;
+
+        case TGT_TELESTRAT:
+             NewSymbol ("__TELESTRAT__", 1);
+             break;
 
         case TGT_NES:
             NewSymbol ("__NES__", 1);
@@ -311,8 +334,24 @@ static void SetSys (const char* Sys)
             NewSymbol ("__PCE__", 1);
             break;
 
+        case TGT_CX16:
+            CBMSystem ("__CX16__");
+            break;
+
+        case TGT_SYM1:
+            NewSymbol ("__SYM1__", 1);
+            break;
+
+        case TGT_KIM1:
+            NewSymbol ("__KIM1__", 1);
+            break;
+
+        case TGT_RP6502:
+            NewSymbol ("__RP6502__", 1);
+            break;
+
         default:
-            AbEnd ("Invalid target name: `%s'", Sys);
+            AbEnd ("Invalid target name: '%s'", Sys);
 
     }
 
@@ -327,7 +366,7 @@ static void FileNameOption (const char* Opt, const char* Arg, StrBuf* Name)
 {
     /* Cannot have the option twice */
     if (SB_NotEmpty (Name)) {
-        AbEnd ("Cannot use option `%s' twice", Opt);
+        AbEnd ("Cannot use option '%s' twice", Opt);
     }
     /* Remember the file name for later */
     SB_CopyStr (Name, Arg);
@@ -408,7 +447,7 @@ static void OptCPU (const char* Opt attribute ((unused)), const char* Arg)
 {
     cpu_t CPU = FindCPU (Arg);
     if (CPU == CPU_UNKNOWN) {
-        AbEnd ("Invalid CPU: `%s'", Arg);
+        AbEnd ("Invalid CPU: '%s'", Arg);
     } else {
         SetCPU (CPU);
     }
@@ -454,12 +493,15 @@ static void OptDebugInfo (const char* Opt attribute ((unused)),
 static void OptFeature (const char* Opt attribute ((unused)), const char* Arg)
 /* Set an emulation feature */
 {
-    /* Make a string buffer from Arg */
-    StrBuf Feature;
+    /* Make a string buffer from Arg and use it to find the feature. */
+    StrBuf StrFeature;
+    feature_t Feature = FindFeature (SB_InitFromString (&StrFeature, Arg));
 
-    /* Set the feature, check for errors */
-    if (SetFeature (SB_InitFromString (&Feature, Arg)) == FEAT_UNKNOWN) {
-        AbEnd ("Illegal emulation feature: `%s'", Arg);
+    /* Enable the feature, check for errors */
+    if (Feature == FEAT_UNKNOWN) {
+        AbEnd ("Illegal emulation feature: '%s'", Arg);
+    } else {
+        SetFeature (Feature, 1);
     }
 }
 
@@ -514,7 +556,7 @@ static void OptListBytes (const char* Opt, const char* Arg)
 
     /* Check the bounds */
     if (Num != 0 && (Num < MIN_LIST_BYTES || Num > MAX_LIST_BYTES)) {
-        AbEnd ("Argument for option `%s' is out of range", Opt);
+        AbEnd ("Argument for option '%s' is out of range", Opt);
     }
 
     /* Use the value */
@@ -530,7 +572,7 @@ static void OptListing (const char* Opt, const char* Arg)
     ** the filename is empty or begins with the option char.
     */
     if (Arg == 0 || *Arg == '\0' || *Arg == '-') {
-        Fatal ("The meaning of `%s' has changed. It does now "
+        Fatal ("The meaning of '%s' has changed. It does now "
                "expect a file name as argument.", Opt);
     }
 
@@ -547,7 +589,7 @@ static void OptMemoryModel (const char* Opt, const char* Arg)
 
     /* Check the current memory model */
     if (MemoryModel != MMODEL_UNKNOWN) {
-        AbEnd ("Cannot use option `%s' twice", Opt);
+        AbEnd ("Cannot use option '%s' twice", Opt);
     }
 
     /* Translate the memory model name and check it */
@@ -615,7 +657,17 @@ static void OptVersion (const char* Opt attribute ((unused)),
                         const char* Arg attribute ((unused)))
 /* Print the assembler version */
 {
-    fprintf (stderr, "ca65 V%s\n", GetVersionAsString ());
+    fprintf (stderr, "%s V%s\n", ProgName, GetVersionAsString ());
+    exit(EXIT_SUCCESS);
+}
+
+
+
+static void OptWarningsAsErrors (const char* Opt attribute ((unused)),
+                                 const char* Arg attribute ((unused)))
+/* Generate an error if any warnings occur */
+{
+    WarningsAsErrors = 1;
 }
 
 
@@ -653,6 +705,24 @@ static void OneLine (void)
     if (CurTok.Tok == TOK_COLON) {
         ULabDef ();
         NextTok ();
+    }
+
+    /* Handle @-style unnamed labels */
+    if (CurTok.Tok == TOK_ULABEL) {
+        if (CurTok.IVal != 0) {
+            Error ("Invalid unnamed label definition");
+        }
+        ULabDef ();
+        NextTok ();
+
+        /* Skip the colon. If NoColonLabels is enabled, allow labels without
+        ** a colon if there is no whitespace before the identifier.
+        */
+        if (CurTok.Tok == TOK_COLON) {
+            NextTok ();
+        } else if (CurTok.WS || !NoColonLabels) {
+            Error ("':' expected");
+        }
     }
 
     /* If the first token on the line is an identifier, check for a macro or
@@ -742,7 +812,7 @@ static void OneLine (void)
             */
             if (CurTok.Tok != TOK_COLON) {
                 if (HadWS || !NoColonLabels) {
-                    Error ("`:' expected");
+                    Error ("':' expected");
                     /* Try some smart error recovery */
                     if (CurTok.Tok == TOK_NAMESPACE) {
                         NextTok ();
@@ -787,7 +857,7 @@ static void OneLine (void)
     } else if (PCAssignment && (CurTok.Tok == TOK_STAR || CurTok.Tok == TOK_PC)) {
         NextTok ();
         if (CurTok.Tok != TOK_EQ) {
-            Error ("`=' expected");
+            Error ("'=' expected");
             SkipUntilSep ();
         } else {
             /* Skip the equal sign */
@@ -810,7 +880,12 @@ static void OneLine (void)
             /* The line has switched the segment */
             Size = 0;
         }
-        DefSizeOfSymbol (Sym, Size);
+        /* Suppress .size Symbol if this Symbol already has a multiply-defined error,
+        ** as it will only create its own additional unnecessary error.
+        */
+        if ((Sym->Flags & SF_MULTDEF) == 0) {
+            DefSizeOfSymbol (Sym, Size);
+        }
     }
 
     /* Line separator must come here */
@@ -883,27 +958,28 @@ int main (int argc, char* argv [])
 {
     /* Program long options */
     static const LongOpt OptTab[] = {
-        { "--auto-import",      0,      OptAutoImport           },
-        { "--bin-include-dir",  1,      OptBinIncludeDir        },
-        { "--cpu",              1,      OptCPU                  },
-        { "--create-dep",       1,      OptCreateDep            },
-        { "--create-full-dep",  1,      OptCreateFullDep        },
-        { "--debug",            0,      OptDebug                },
-        { "--debug-info",       0,      OptDebugInfo            },
-        { "--feature",          1,      OptFeature              },
-        { "--help",             0,      OptHelp                 },
-        { "--ignore-case",      0,      OptIgnoreCase           },
-        { "--include-dir",      1,      OptIncludeDir           },
-        { "--large-alignment",  0,      OptLargeAlignment       },
-        { "--list-bytes",       1,      OptListBytes            },
-        { "--listing",          1,      OptListing              },
-        { "--memory-model",     1,      OptMemoryModel          },
-        { "--pagelength",       1,      OptPageLength           },
-        { "--relax-checks",     0,      OptRelaxChecks          },
-        { "--smart",            0,      OptSmart                },
-        { "--target",           1,      OptTarget               },
-        { "--verbose",          0,      OptVerbose              },
-        { "--version",          0,      OptVersion              },
+        { "--auto-import",         0,      OptAutoImport           },
+        { "--bin-include-dir",     1,      OptBinIncludeDir        },
+        { "--cpu",                 1,      OptCPU                  },
+        { "--create-dep",          1,      OptCreateDep            },
+        { "--create-full-dep",     1,      OptCreateFullDep        },
+        { "--debug",               0,      OptDebug                },
+        { "--debug-info",          0,      OptDebugInfo            },
+        { "--feature",             1,      OptFeature              },
+        { "--help",                0,      OptHelp                 },
+        { "--ignore-case",         0,      OptIgnoreCase           },
+        { "--include-dir",         1,      OptIncludeDir           },
+        { "--large-alignment",     0,      OptLargeAlignment       },
+        { "--list-bytes",          1,      OptListBytes            },
+        { "--listing",             1,      OptListing              },
+        { "--memory-model",        1,      OptMemoryModel          },
+        { "--pagelength",          1,      OptPageLength           },
+        { "--relax-checks",        0,      OptRelaxChecks          },
+        { "--smart",               0,      OptSmart                },
+        { "--target",              1,      OptTarget               },
+        { "--verbose",             0,      OptVerbose              },
+        { "--version",             0,      OptVersion              },
+        { "--warnings-as-errors",  0,      OptWarningsAsErrors     },
     };
 
     /* Name of the global name space */
@@ -1020,7 +1096,7 @@ int main (int argc, char* argv [])
         } else {
             /* Filename. Check if we already had one */
             if (InFile) {
-                fprintf (stderr, "%s: Don't know what to do with `%s'\n",
+                fprintf (stderr, "%s: Don't know what to do with '%s'\n",
                          ProgName, Arg);
                 exit (EXIT_FAILURE);
             } else {
@@ -1106,6 +1182,10 @@ int main (int argc, char* argv [])
     if (Verbosity >= 2) {
         SymDump (stdout);
         SegDump ();
+    }
+
+    if (WarningCount > 0 && WarningsAsErrors) {
+        Error("Warnings as errors");
     }
 
     /* If we didn't have an errors, finish off the line infos */

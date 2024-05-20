@@ -7,7 +7,7 @@
 /*                                                                           */
 /*                                                                           */
 /* (C) 1998-2006, Ullrich von Bassewitz                                      */
-/*                Römerstrasse 52                                            */
+/*                Roemerstrasse 52                                           */
 /*                D-70794 Filderstadt                                        */
 /* EMail:         uz@cc65.org                                                */
 /*                                                                           */
@@ -45,11 +45,8 @@
 
 
 
-/* Include the base header file for the 264 series. include file.
- */
-#ifndef _CBM264_H
+/* Include the base header file for the 264 series. */
 #include <cbm264.h>
-#endif
 
 /* Define hardware */
 #include <_6551.h>
@@ -59,7 +56,7 @@
 
 /* The addresses of the static drivers */
 extern void plus4_stdjoy_joy[];   /* Referred to by joy_static_stddrv[] */
-extern void plus4_stdser_ser[];
+extern void plus4_stdser_ser[];   /* Referred to by ser_static_stddrv[] */
 
 
 

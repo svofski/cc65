@@ -146,29 +146,30 @@ static PCXHeader* ReadPCXHeader (FILE* F, const char* Name)
 
     /* Check the header data */
     if (P->Id != PCX_MAGIC_ID || P->FileVersion == 1 || P->FileVersion > 5) {
-        Error ("`%s' is not a PCX file", Name);
+        Error ("'%s' is not a PCX file", Name);
     }
     if (P->Compressed > 1) {
-        Error ("Unsupported compression (%d) in PCX file `%s'",
+        Error ("Unsupported compression (%d) in PCX file '%s'",
                P->Compressed, Name);
     }
     /* We support:
-    **   - one plane with either 1 or 8 bits per pixel
+    **   - one plane with either 1, 4 or 8 bits per pixel
     **   - three planes with 8 bits per pixel
     **   - four planes with 8 bits per pixel (does this exist?)
     */
     if (!((P->BPP == 1 && P->Planes == 1) ||
+          (P->BPP == 4 && P->Planes == 1) ||
           (P->BPP == 8 && (P->Planes == 1 || P->Planes == 3 || P->Planes == 4)))) {
         /* We could support others, but currently we don't */
-        Error ("Unsupported PCX format: %u planes, %u bpp in PCX file `%s'",
+        Error ("Unsupported PCX format: %u planes, %u bpp in PCX file '%s'",
                P->Planes, P->BPP, Name);
     }
     if (P->PalInfo != 1 && P->PalInfo != 2) {
-        Error ("Unsupported palette info (%u) in PCX file `%s'",
+        Error ("Unsupported palette info (%u) in PCX file '%s'",
                P->PalInfo, Name);
     }
     if (!ValidBitmapSize (P->Width, P->Height)) {
-        Error ("PCX file `%s' has an unsupported size (w=%u, h=%d)",
+        Error ("PCX file '%s' has an unsupported size (w=%u, h=%d)",
                Name, P->Width, P->Height);
     }
 
@@ -204,11 +205,14 @@ static void DumpPCXHeader (const PCXHeader* P, const char* Name)
 static void ReadPlane (FILE* F, PCXHeader* P, unsigned char* L)
 /* Read one (possibly compressed) plane from the file */
 {
-    if (P->Compressed) {
+    unsigned i;
 
+    if (P->Compressed) {
         /* Uncompress RLE data */
-        unsigned Remaining = P->Width;
-        while (Remaining) {
+        signed Remaining = P->BytesPerPlane;
+        signed WidthCounter = P->Width;
+
+        while (Remaining > 0) {
 
             unsigned char C;
 
@@ -224,21 +228,111 @@ static void ReadPlane (FILE* F, PCXHeader* P, unsigned char* L)
             }
 
             /* Write the data to the buffer */
-            if (C > Remaining) {
-                C = Remaining;
+            switch (P->BPP) {
+            default:
+                for (i = 0; i < C; i++) {
+                    if (WidthCounter > 0) {
+                        *L = B;
+                        L += 1;
+                        WidthCounter -= 1;
+                    }
+                    Remaining -= 1;
+                }
+                break;
+            case 4:
+                for (i = 0; i < C; i++) {
+                    if (WidthCounter > 0) {
+                        *L = B >> 4;
+                        L += 1;
+                        WidthCounter -= 1;
+                    }
+                    if (WidthCounter > 0) {
+                        *L = B & 15;
+                        L += 1;
+                        WidthCounter -= 1;
+                    }
+                    Remaining -= 1;
+                }
+                break;
+            case 2:
+                for (i = 0; i < C; i++) {
+                    if (WidthCounter > 0) {
+                        *L = (B >> 6) & 3;
+                        L += 1;
+                        WidthCounter -= 1;
+                    }
+                    if (WidthCounter > 0) {
+                        *L = (B >> 4) & 3;
+                        L += 1;
+                        WidthCounter -= 1;
+                    }
+                    if (WidthCounter > 0) {
+                        *L = (B >> 2) & 3;
+                        L += 1;
+                        WidthCounter -= 1;
+                    }
+                    if (WidthCounter > 0) {
+                        *L = B & 3;
+                        L += 1;
+                        WidthCounter -= 1;
+                    }
+                    Remaining -= 1;
+                }
+                break;
+            case 1:
+                for (i = 0; i < C; i++) {
+                    if (WidthCounter > 0) {
+                        *L = (B >> 7) & 1;
+                        L += 1;
+                        WidthCounter -= 1;
+                    }
+                    if (WidthCounter > 0) {
+                        *L = (B >> 6) & 1;
+                        L += 1;
+                        WidthCounter -= 1;
+                    }
+                    if (WidthCounter > 0) {
+                        *L = (B >> 5) & 1;
+                        L += 1;
+                        WidthCounter -= 1;
+                    }
+                    if (WidthCounter > 0) {
+                        *L = (B >> 4) & 1;
+                        L += 1;
+                        WidthCounter -= 1;
+                    }
+                    if (WidthCounter > 0) {
+                        *L = (B >> 3) & 1;
+                        L += 1;
+                        WidthCounter -= 1;
+                    }
+                    if (WidthCounter > 0) {
+                        *L = (B >> 2) & 1;
+                        L += 1;
+                        WidthCounter -= 1;
+                    }
+                    if (WidthCounter > 0) {
+                        *L = (B >> 1) & 1;
+                        L += 1;
+                        WidthCounter -= 1;
+                    }
+                    if (WidthCounter > 0) {
+                        *L = B & 1;
+                        L += 1;
+                        WidthCounter -= 1;
+                    }
+                    Remaining -= 1;
+                }
+                break;
             }
-            memset (L, B, C);
-
-            /* Bump counters */
-            L += C;
-            Remaining -= C;
-
         }
     } else {
-
         /* Just read one line */
-        ReadData (F, L, P->Width);
-
+        if (P->BPP == 4) {
+            printf("Not implemented\n");
+        } else {
+            ReadData (F, L, P->Width);
+        }
     }
 }
 
@@ -261,7 +355,7 @@ Bitmap* ReadPCXFile (const Collection* A)
     /* Open the file */
     FILE* F = fopen (Name, "rb");
     if (F == 0) {
-        Error ("Cannot open PCX file `%s': %s", Name, strerror (errno));
+        Error ("Cannot open PCX file '%s': %s", Name, strerror (errno));
     }
 
     /* Read the PCX header */
@@ -357,7 +451,7 @@ Bitmap* ReadPCXFile (const Collection* A)
 
                 /* Check for palette marker */
                 if (Read8 (F) != 0x0C) {
-                    Error ("Invalid palette marker in PCX file `%s'", Name);
+                    Error ("Invalid palette marker in PCX file '%s'", Name);
                 }
 
             } else if (EndPos == CurPos) {
@@ -367,12 +461,12 @@ Bitmap* ReadPCXFile (const Collection* A)
 
                 /* Check the maximum index for safety */
                 if (MaxIdx > 15) {
-                    Error ("PCX file `%s' contains more than 16 indexed colors "
+                    Error ("PCX file '%s' contains more than 16 indexed colors "
                            "but no extra palette", Name);
                 }
 
             } else {
-                Error ("Error in PCX file `%s': %lu bytes at end of pixel data",
+                Error ("Error in PCX file '%s': %lu bytes at end of pixel data",
                        Name, EndPos - CurPos);
             }
 

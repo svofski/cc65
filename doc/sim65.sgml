@@ -3,12 +3,13 @@
 <article>
 
 <title>sim65 Users Guide
-<author><url url="mailto:polluks@sdf.lonestar.org" name="Stefan A. Haubenthal">
-<date>2016-01-05
+<author><url url="mailto:polluks@sdf.lonestar.org" name="Stefan A. Haubenthal">,<newline>
+<url url="mailto:bbbradsmith@users.noreply.github.com" name="Brad Smith">
+
 
 <abstract>
 sim65 is a simulator for 6502 and 65C02 CPUs. It allows to test target
-independed code.
+independent code.
 </abstract>
 
 <!-- Table of contents -->
@@ -19,8 +20,8 @@ independed code.
 <sect>Overview<p>
 
 
-sim65 is the only solution as part of the toolchain to execute code. The
-binary needs to be compiled with <tt/--target sim6502/ or <tt/--target sim65c02/.
+sim65 is used as part of the toolchain to test 6502 or 65C02 code.
+The binary to test should be compiled with <tt/--target sim6502/ or <tt/--target sim65c02/.
 
 
 <sect>Usage<p>
@@ -28,18 +29,27 @@ binary needs to be compiled with <tt/--target sim6502/ or <tt/--target sim65c02/
 The simulator is called as follows:
 
 <tscreen><verb>
-	Usage: sim65 [options] file [arguments]
-	Short options:
-	  -h			Help (this text)
-	  -v			Increase verbosity
-	  -V			Print the simulator version number
-	  -x <num>		Exit simulator after <num> cycles
+        Usage: sim65 [options] file [arguments]
+        Short options:
+          -h                    Help (this text)
+          -c                    Print amount of executed CPU cycles
+          -v                    Increase verbosity
+          -V                    Print the simulator version number
+          -x <num>              Exit simulator after <num> cycles
 
-	Long options:
-	  --help		Help (this text)
-	  --verbose		Increase verbosity
-	  --version		Print the simulator version number
+        Long options:
+          --help                Help (this text)
+          --cycles              Print amount of executed CPU cycles
+          --verbose             Increase verbosity
+          --version             Print the simulator version number
 </verb></tscreen>
+
+sim65 will exit with the error code of the simulated program,
+which is limited to an 8-bit result 0-255.
+
+An error in sim65, like bad arguments or an internal problem will exit with <tt/1/.
+
+A timeout from <tt/-x/ will exit with <tt/2/.
 
 
 <sect1>Command line options in detail<p>
@@ -51,6 +61,13 @@ Here is a description of all the command line options:
   <tag><tt>-h, --help</tt></tag>
 
   Print the short option summary shown above.
+
+
+  <tag><tt>-c, --cycles</tt></tag>
+
+  Print the number of executed CPU cycles when the program terminates.
+  The cycles for the final "<tt>jmp exit</tt>" are not included in this
+  count.
 
 
   <tag><tt>-v, --verbose</tt></tag>
@@ -81,7 +98,7 @@ Example output for the command
 sim65 --verbose --verbose samples/gunzip65
 </verb></tscreen>
 <tscreen><verb>
-Loaded `samples/gunzip65' at $0200-$151F
+Loaded 'samples/gunzip65' at $0200-$151F
 PVWrite ($0001, $13C9, $000F)
 GZIP file name:PVWrite ($0001, $151F, $0001)
 
@@ -95,6 +112,121 @@ Not GZIP formatPVWrite ($0001, $151F, $0001)
 PVExit ($01)
 </verb></tscreen>
 
+
+<sect>Creating a Test in C<p>
+
+For a C test linked with <tt/--target sim6502/ and the <tt/sim6502.lib/ library,
+command line arguments to <tt/sim65/ will be passed to <tt/main/,
+and the return value from <tt/main/ will become sim65's exit code.
+The <tt/stdlib.h/ <tt/exit/ function may also be used to terminate with an exit code.
+
+Exit codes are limited to an unsigned 8 bit value. (E.g. returning -1 will give an exit code of 255.)
+
+The standard C library high level file input and output is functional.
+A sim65 application can be written like a command line application,
+providing command line arguments to <tt/main/ and using the <tt/stdio.h/ interfaces
+to interact with the console or access files.
+
+Internally, file input and output is provided at a lower level by
+a set of built-in paravirtualization functions (see <ref id="paravirt-internal" name="below">).
+
+Example:
+
+<tscreen><verb>
+#include <stdio.h>
+int main()
+{
+    printf("Hello!\n");
+    return 5;
+}
+
+// Build and run:
+//   cl65 -t sim6502 -o example.prg example.c
+//   sim65 example.prg
+
+// Build and run, separate steps:
+//   cc65 -t sim6502 -o example.s example.c
+//   ca65 -t sim6502 -o example.o example.s
+//   ld65 -t sim6502 -o example.prg example.o sim6502.lib
+//   sim65 example.prg
+</verb></tscreen>
+
+<sect>Creating a Test in Assembly<p>
+
+Though a C test may also link with assembly code,
+a pure assembly test can also be created.
+
+Link with <tt/--target sim6502/ or <tt/--target sim65c02/ and the corresponding library,
+define and export <tt/_main/ as an entry point,
+and the sim65 library provides two ways to return an 8-bit exit code:
+
+<itemize>
+
+<item>Return from <tt/_main/ with the exit code in <tt/A/.
+
+<item><tt/jmp exit/ with the code in <tt/A/. (<tt/.import exit/ from the sim65 library.)
+
+</itemize>
+
+Example:
+
+<tscreen><verb>
+.export _main
+_main:
+    lda #5
+    rts
+
+; Build and run:
+;   cl65 -t sim6502 -o example.prg example.s
+;   sim65 example.prg
+
+; Build and run, separate steps:
+;   ca65 -t sim6502 -o example.o example.s
+;   ld65 -t sim6502 -o example.prg example.o sim6502.lib
+;   sim65 example.prg
+</verb></tscreen>
+
+Internally, the binary program file has a 12 byte header provided by the library:
+
+<itemize>
+
+<item>5 byte <bf/signature/: <tt/$73, $69, $6D, $36, $35/ or <tt/'sim65'/
+
+<item>1 byte <bf/version/: <tt/2/
+
+<item>1 byte <bf/CPU type/: <tt/0/ = 6502, <tt/1/ = 65C02
+
+<item>1 byte <bf/sp address/: the zero page address of the C parameter stack pointer <tt/sp/ used by the paravirtualization functions
+
+<item>1 word <bf/load address/: where to load the data from the file into memory (default: <tt/$0200/)
+
+<item>1 word <bf/reset address/: specifies where to begin execution after loading (default: <tt/$0200/)
+
+</itemize>
+
+Other internal details:
+
+<itemize>
+
+<item>The entire 64 kilobyte address space is writeable RAM.
+Aside from the loaded binary, the reset vector at <tt/$FFFC/ will be
+pre-loaded with the given <bf/reset address/.
+
+<item>The <tt/exit/ address is <tt/$FFF9/.
+Jumping to this address will terminate execution with the A register value as an exit code.
+
+<label id="paravirt-internal">
+<item>Several bytes immediately below the vector table are reserved for paravirtualization functions.
+Except for <tt/exit/, a <tt/JSR/ to one of these addresses will return immediately after performing a special function.
+These use cc65 calling conventions, and are intended for use with the sim65 target C library.
+
+<item><tt/IRQ/ and <tt/NMI/ events will not be generated, though <tt/BRK/
+can be used if the IRQ vector at <tt/$FFFE/ is manually prepared by the test code.
+
+<item>The <tt/sim6502/ or <tt/sim65c02/ targets provide a default configuration,
+but if customization is needed <tt/sim6502.cfg/ or <tt/sim65c02.cfg/ might be used as a template.
+
+</itemize>
 
 
 <sect>Copyright<p>
@@ -112,14 +244,14 @@ including commercial applications, and to alter it and redistribute it
 freely, subject to the following restrictions:
 
 <enum>
-<item>	The origin of this software must not be misrepresented; you must not
-	claim that you wrote the original software. If you use this software
-	in a product, an acknowledgment in the product documentation would be
-	appreciated but is not required.
-<item>	Altered source versions must be plainly marked as such, and must not
-	be misrepresented as being the original software.
-<item>	This notice may not be removed or altered from any source
-	distribution.
+<item>  The origin of this software must not be misrepresented; you must not
+        claim that you wrote the original software. If you use this software
+        in a product, an acknowledgment in the product documentation would be
+        appreciated but is not required.
+<item>  Altered source versions must be plainly marked as such, and must not
+        be misrepresented as being the original software.
+<item>  This notice may not be removed or altered from any source
+        distribution.
 </enum>
 
 </article>

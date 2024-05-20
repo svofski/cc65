@@ -7,7 +7,6 @@
         .export         _write
         .constructor    initstdout
 
-        .import         SETLFS, OPEN, CKOUT, BSOUT, READST, CLRCH
         .import         rwcommon
         .importzp       sp, ptr1, ptr2, ptr3
 
@@ -20,7 +19,7 @@
 ;--------------------------------------------------------------------------
 ; initstdout: Open the stdout and stderr file descriptors for the screen.
 
-.segment        "INIT"
+.segment        "ONCE"
 
 .proc   initstdout
 
@@ -56,15 +55,15 @@
 
         jsr     CKOUT
         bcc     @L2
-@error: jmp     __mappederrno   ; Store into __oserror, map to errno, return -1
+@error: jmp     ___mappederrno  ; Store into ___oserror, map to errno, return -1
 
 ; Output the next character from the buffer
 
 @L0:    ldy     #0
-        lda     (ptr2),y
-        inc     ptr2
+        lda     (ptr1),y
+        inc     ptr1
         bne     @L1
-        inc     ptr2+1          ; A = *buf++;
+        inc     ptr1+1          ; A = *buf++;
 @L1:    jsr     BSOUT
 
 ; Check the status
@@ -84,19 +83,19 @@
 
 ; Decrement count
 
-@L2:    inc     ptr1
+@L2:    dec     ptr2
         bne     @L0
-        inc     ptr1+1
+        dec     ptr2+1
         bne     @L0
 
 ; Wrote all chars or disk full. Close the output channel
 
 @L3:    jsr     CLRCH
 
-; Clear _oserror and return the number of chars written
+; Clear __oserror and return the number of chars written
 
         lda     #0
-        sta     __oserror
+        sta     ___oserror
         lda     ptr3
         ldx     ptr3+1
         rts
@@ -107,12 +106,12 @@ devnotpresent2:
         pla
 devnotpresent:
         lda     #ENODEV
-        jmp     __directerrno   ; Sets _errno, clears _oserror, returns -1
+        .byte   $2C             ; Skip next opcode via BIT <abs>
 
 ; Error entry: The given file descriptor is not valid or not open
 
 invalidfd:
         lda     #EBADF
-        jmp     __directerrno   ; Sets _errno, clears _oserror, returns -1
+        jmp     ___directerrno  ; Sets _errno, clears __oserror, returns -1
 
 .endproc

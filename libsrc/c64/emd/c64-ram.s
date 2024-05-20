@@ -44,7 +44,7 @@
 ; Constants
 
 BASE    = $D000
-PAGES   = ($10000 - BASE) / 256
+PAGES   = ($FF00 - BASE) / 256
 
 ; ------------------------------------------------------------------------
 ; Data.
@@ -65,8 +65,9 @@ window:         .res    256             ; Memory "window"
 INSTALL:
         ldx     #$FF
         stx     curpage                 ; Invalidate the current page
-        inx                             ; X = 0
-        txa                             ; A = X = EM_ERR_OK
+        .assert EM_ERR_OK = 0, error
+        inx
+        txa
 ;       rts                             ; Run into UNINSTALL instead
 
 ; ------------------------------------------------------------------------
@@ -167,7 +168,7 @@ loop:   .repeat 8
 
 ; Done
 
-done:   rts               
+done:   rts
 
 ; ------------------------------------------------------------------------
 ; COPYFROM: Copy from extended into linear memory. A pointer to a structure
@@ -178,7 +179,7 @@ done:   rts
 COPYFROM:
         sta     ptr3
         stx     ptr3+1                  ; Save the passed em_copy pointer
-                       
+
         ldy     #EM_COPY::OFFS
         lda     (ptr3),y
         sta     ptr1
@@ -267,5 +268,3 @@ COPYTO: sta     ptr3
         sta     ptr1+1                  ; From
 
         jmp     common
-
-

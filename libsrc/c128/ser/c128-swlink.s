@@ -45,15 +45,15 @@
 
 ; Jump table
 
-        .word   INSTALL
-        .word   UNINSTALL
-        .word   OPEN
-        .word   CLOSE
-        .word   GET
-        .word   PUT
-        .word   STATUS
-        .word   IOCTL
-        .word   IRQ
+        .word   SER_INSTALL
+        .word   SER_UNINSTALL
+        .word   SER_OPEN
+        .word   SER_CLOSE
+        .word   SER_GET
+        .word   SER_PUT
+        .word   SER_STATUS
+        .word   SER_IOCTL
+        .word   SER_IRQ
 
 ;----------------------------------------------------------------------------
 ; I/O definitions
@@ -155,11 +155,11 @@ Vector  := *+1
 .reloc
 
 ;----------------------------------------------------------------------------
-; INSTALL routine. Is called after the driver is loaded into memory. If
+; SER_INSTALL routine. Is called after the driver is loaded into memory. If
 ; possible, check if the hardware is present.
 ; Must return an SER_ERR_xx code in a/x.
 
-INSTALL:
+SER_INSTALL:
 
 ; Deactivate DTR and disable 6551 interrupts
 
@@ -187,15 +187,16 @@ SetNMI: sta     NMIVec
 
 ; Done, return an error code
 
-        lda     #<SER_ERR_OK
-        tax                     ; A is zero
+        lda     #SER_ERR_OK
+        .assert SER_ERR_OK = 0, error
+        tax
         rts
 
 ;----------------------------------------------------------------------------
-; UNINSTALL routine. Is called before the driver is removed from memory.
+; SER_UNINSTALL routine. Is called before the driver is removed from memory.
 ; Must return an SER_ERR_xx code in a/x.
 
-UNINSTALL:
+SER_UNINSTALL:
 
 ; Stop interrupts, drop DTR
 
@@ -212,7 +213,7 @@ UNINSTALL:
 ; PARAMS routine. A pointer to a ser_params structure is passed in ptr1.
 ; Must return an SER_ERR_xx code in a/x.
 
-OPEN:
+SER_OPEN:
 
 ; Check if the handshake setting is valid
 
@@ -264,30 +265,31 @@ OPEN:
 
 ; Done
 
-        lda     #<SER_ERR_OK
-        tax                             ; A is zero
+        lda     #SER_ERR_OK
+        .assert SER_ERR_OK = 0, error
+        tax
         rts
 
 ; Invalid parameter
 
 InvParam:
-        lda     #<SER_ERR_INIT_FAILED
-        ldx     #>SER_ERR_INIT_FAILED
+        lda     #SER_ERR_INIT_FAILED
+        ldx     #0 ; return value is char
         rts
 
 ; Baud rate not available
 
 InvBaud:
-        lda     #<SER_ERR_BAUD_UNAVAIL
-        ldx     #>SER_ERR_BAUD_UNAVAIL
+        lda     #SER_ERR_BAUD_UNAVAIL
+        ldx     #0 ; return value is char
         rts
 
 ;----------------------------------------------------------------------------
-; CLOSE: Close the port, disable interrupts and flush the buffer. Called
+; SER_CLOSE: Close the port, disable interrupts and flush the buffer. Called
 ; without parameters. Must return an error code in a/x.
 ;
 
-CLOSE:
+SER_CLOSE:
 
 ; Stop interrupts, drop DTR
 
@@ -300,29 +302,26 @@ CLOSE:
 
 ; Return OK
 
-        lda     #<SER_ERR_OK
-        tax                             ; A is zero
+        lda     #SER_ERR_OK
+        .assert SER_ERR_OK = 0, error
+        tax
         rts
 
 ;----------------------------------------------------------------------------
-; GET: Will fetch a character from the receive buffer and store it into the
+; SER_GET: Will fetch a character from the receive buffer and store it into the
 ; variable pointer to by ptr1. If no data is available, SER_ERR_NO_DATA is
 ; return.
 ;
 
-GET:    ldx     SendFreeCnt             ; Send data if necessary
-        inx                             ; X == $FF?
-        beq     @L1
-        lda     #$00
-        jsr     TryToSend
+SER_GET:
 
 ; Check for buffer empty
 
-@L1:    lda     RecvFreeCnt             ; (25)
+        lda     RecvFreeCnt             ; (25)
         cmp     #$ff
         bne     @L2
-        lda     #<SER_ERR_NO_DATA
-        ldx     #>SER_ERR_NO_DATA
+        lda     #SER_ERR_NO_DATA
+        ldx     #0 ; return value is char
         rts
 
 ; Check for flow stopped & enough free: release flow control
@@ -349,65 +348,71 @@ GET:    ldx     SendFreeCnt             ; Send data if necessary
         rts
 
 ;----------------------------------------------------------------------------
-; PUT: Output character in A.
+; SER_PUT: Output character in A.
 ; Must return an error code in a/x.
 ;
 
-PUT:
+SER_PUT:
 
 ; Try to send
 
         ldx     SendFreeCnt
-        inx                             ; X = $ff?
+        cpx     #$FF                   ; Nothing to flush
         beq     @L2
         pha
         lda     #$00
         jsr     TryToSend
         pla
 
-; Put byte into send buffer & send
+; Reload SendFreeCnt after TryToSend
 
-@L2:    ldx     SendFreeCnt
-        bne     @L3
-        lda     #<SER_ERR_OVERFLOW      ; X is already zero
+        ldx     SendFreeCnt
+        bne     @L2
+        lda     #SER_ERR_OVERFLOW       ; X is already zero
         rts
 
-@L3:    ldx     SendTail
+; Put byte into send buffer & send
+
+@L2:    ldx     SendTail
         sta     SendBuf,x
         inc     SendTail
         dec     SendFreeCnt
         lda     #$ff
         jsr     TryToSend
-        lda     #<SER_ERR_OK
+        lda     #SER_ERR_OK
+        .assert SER_ERR_OK = 0, error
         tax
         rts
 
 ;----------------------------------------------------------------------------
-; STATUS: Return the status in the variable pointed to by ptr1.
+; SER_STATUS: Return the status in the variable pointed to by ptr1.
 ; Must return an error code in a/x.
 ;
 
-STATUS: lda     ACIA_STATUS
+SER_STATUS:
+        lda     ACIA_STATUS
         ldx     #0
         sta     (ptr1,x)
-        txa                             ; SER_ERR_OK
+        .assert SER_ERR_OK = 0, error
+        txa
         rts
 
 ;----------------------------------------------------------------------------
-; IOCTL: Driver defined entry point. The wrapper will pass a pointer to ioctl
+; SER_IOCTL: Driver defined entry point. The wrapper will pass a pointer to ioctl
 ; specific data in ptr1, and the ioctl code in A.
 ; Must return an error code in a/x.
 ;
 
-IOCTL:  lda     #<SER_ERR_INV_IOCTL     ; We don't support ioclts for now
-        ldx     #>SER_ERR_INV_IOCTL
+SER_IOCTL:
+        lda     #SER_ERR_INV_IOCTL      ; We don't support ioclts for now
+        ldx     #0 ; return value is char
         rts
 
 ;----------------------------------------------------------------------------
 ; IRQ: Not used on the C128
 ;
 
-IRQ     = $0000
+SER_IRQ     = $0000
 
 ;----------------------------------------------------------------------------
 ;
@@ -458,25 +463,25 @@ NmiHandler:
         sta     tmp1            ; Remember tryHard flag
 @L0:    lda     SendFreeCnt
         cmp     #$ff
-        beq     @L3             ; Bail out
+        beq     @L2             ; Bail out
 
 ; Check for flow stopped
 
 @L1:    lda     Stopped
-        bne     @L3             ; Bail out
+        bne     @L2             ; Bail out
 
 ; Check that swiftlink is ready to send
 
-@L2:    lda     ACIA_STATUS
+        lda     ACIA_STATUS
         and     #$10
-        bne     @L4
+        bne     @L3
         bit     tmp1            ;keep trying if must try hard
-        bmi     @L0
-@L3:    rts
+        bmi     @L1
+@L2:    rts
 
 ; Send byte and try again
 
-@L4:    ldx     SendHead
+@L3:    ldx     SendHead
         lda     SendBuf,x
         sta     ACIA_DATA
         inc     SendHead
@@ -500,5 +505,3 @@ InitBuffers:
         stx     RecvFreeCnt
         stx     SendFreeCnt
         rts
-
-

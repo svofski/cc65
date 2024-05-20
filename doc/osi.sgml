@@ -1,12 +1,10 @@
 <!doctype linuxdoc system>
 
 <article>
-
 <title>Ohio Scientific-specific information for cc65
 <author>
 <url url="mailto:stephan.muehlstrasser@web.de" name="Stephan M&uuml;hlstrasser">,<newline>
 <url url="mailto:greg.king5@verizon.net" name="Greg King">
-<date>2015-03-17
 
 <abstract>
 An overview over the Ohio Scientific runtime system as it is implemented for the cc65 C
@@ -189,7 +187,20 @@ Currently the following extra screen configuration modules are implemented:
 <itemize>
 <item><tt>osic1p-screen-s3-32x28.o</tt>: 32 columns by 28 lines mode
 for Briel Superboard ///</item>
+<item><tt>osic1p-screen-c1p-48x12.s</tt>: 48 columns by 12 lines mode
+for Challenger 1P</item>
 </itemize>
+
+On the Briel Superboard /// you enter 32 column mode by holding down
+the BREAK key on powerup.
+
+On the Challenger 1P you can enable 48 column mode by writing a 1 to
+bit 0 of address &dollar;D800, and writing a 0 to go back to 24 column mode.
+You can use code like the following to do this:
+
+<tscreen><verb>
+*(char*)0xd800 = 1; /* Switch to 48 column mode */
+</verb></tscreen>
 
 <sect>Limitations<p>
 
@@ -219,14 +230,14 @@ including commercial applications, and to alter it and redistribute it
 freely, subject to the following restrictions:
 
 <enum>
-<item>	The origin of this software must not be misrepresented; you must not
-	claim that you wrote the original software. If you use this software
-	in a product, an acknowledgment in the product documentation would be
-	appreciated but is not required.
-<item>	Altered source versions must be plainly marked as such, and must not
-	be misrepresented as being the original software.
-<item>	This notice may not be removed or altered from any source
-	distribution.
+<item>  The origin of this software must not be misrepresented; you must not
+        claim that you wrote the original software. If you use this software
+        in a product, an acknowledgment in the product documentation would be
+        appreciated but is not required.
+<item>  Altered source versions must be plainly marked as such, and must not
+        be misrepresented as being the original software.
+<item>  This notice may not be removed or altered from any source
+        distribution.
 </enum>
 
 </article>

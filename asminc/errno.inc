@@ -1,13 +1,13 @@
-;                                                   
+;
 ; Ullrich von Bassewitz, 16.05.2000
 ;
 
 ; Variables and functions
 
-        .global         __errno, __oserror
-        .global         __osmaperrno
-        .global         __seterrno
-        .global         __directerrno, __mappederrno
+        .global         ___errno, ___oserror
+        .global         ___osmaperrno
+        .global         ___seterrno
+        .global         ___directerrno, ___mappederrno
 
 ; Error codes, must match the values in the C headers
 .enum
@@ -28,6 +28,7 @@
         ESPIPE                  ; Illegal seek
         ERANGE                  ; Range error
         EBADF                   ; Bad file number
+        ENOEXEC                 ; Exec format error
         EUNKNOWN                ; Unknown OS specific error - must be last!
 
         EMAX    = EUNKNOWN      ; Highest error code

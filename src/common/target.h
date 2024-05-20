@@ -55,7 +55,9 @@ typedef enum {
     TGT_NONE,
     TGT_MODULE,
     TGT_ATARI,
+    TGT_ATARI2600,
     TGT_ATARI5200,
+    TGT_ATARI7800,
     TGT_ATARIXL,
     TGT_VIC20,
     TGT_C16,
@@ -70,22 +72,30 @@ typedef enum {
     TGT_APPLE2,
     TGT_APPLE2ENH,
     TGT_GEOS_CBM,
+    TGT_CREATIVISION,
     TGT_GEOS_APPLE,
     TGT_LUNIX,
     TGT_ATMOS,
+    TGT_TELESTRAT,
     TGT_NES,
     TGT_SUPERVISION,
     TGT_LYNX,
     TGT_SIM6502,
     TGT_SIM65C02,
     TGT_PCENGINE,
+    TGT_GAMATE,
+    TGT_C65,
+    TGT_CX16,
+    TGT_SYM1,
+    TGT_KIM1,
+    TGT_RP6502,
     TGT_COUNT                   /* Number of target systems */
 } target_t;
 
 /* Collection of target properties */
 typedef struct TargetProperties TargetProperties;
 struct TargetProperties {
-    const char              Name[12];   /* Name of the target */
+    const char              Name[13];   /* Name of the target */
     cpu_t                   DefaultCPU; /* Default CPU for this target */
     unsigned char           BinFmt;     /* Default binary format for this target */
     const unsigned char*    CharMap;    /* Character translation table */
@@ -97,7 +107,8 @@ extern target_t         Target;
 /* Types of available output formats */
 #define BINFMT_DEFAULT          0       /* Default (binary) */
 #define BINFMT_BINARY           1       /* Straight binary format */
-#define BINFMT_O65              2       /* Andre Fachats o65 format */
+#define BINFMT_O65              2       /* Andre Fachat's o65 format */
+#define BINFMT_ATARIEXE         3       /* Standard Atari binary load */
 
 
 
@@ -121,5 +132,4 @@ const char* GetTargetName (target_t Target);
 
 
 /* End of target.h */
-
 #endif

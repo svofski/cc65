@@ -151,12 +151,12 @@ static void OptTarget (const char* Opt attribute ((unused)), const char* Arg)
             break;
 
         case TGT_UNKNOWN:
-            AbEnd ("Unknown target system `%s'", Arg);
+            AbEnd ("Unknown target system '%s'", Arg);
             break;
 
         default:
             /* Target is known but unsupported */
-            AbEnd ("Unsupported target system `%s'", Arg);
+            AbEnd ("Unsupported target system '%s'", Arg);
             break;
     }
 }
@@ -166,7 +166,8 @@ static void OptVersion (const char* Opt attribute ((unused)),
                         const char* Arg attribute ((unused)))
 /* Print the program version */
 {
-    fprintf (stderr, "grc65 V%s\n", GetVersionAsString ());
+    fprintf (stderr, "%s V%s\n", ProgName, GetVersionAsString ());
+    exit(EXIT_SUCCESS);
 }
 
 
@@ -225,18 +226,20 @@ static void openSFile (void)
 }
 
 
-static int findToken (const char **tokenTbl, const char *token)
+static int findToken (const char * const *tokenTbl, const char *token)
 {
     /* takes as input table of tokens and token, returns position in table or -1 if not found */
-    int a = 0;
+    int i;
 
-    while (strlen (tokenTbl[a]) != 0) {
-        if (strcmp (tokenTbl[a], token) == 0) break;
-        a++;
+    if (token != NULL) {
+        for (i = 0; tokenTbl[i][0]; i++) {
+            if (strcmp (tokenTbl[i], token) == 0) {
+                return i;
+            }
+        }
     }
 
-    if (strlen (tokenTbl[a]) == 0) a = -1;
-    return a;
+    return -1;
 }
 
 
@@ -849,18 +852,29 @@ static char *filterInput (FILE *F, char *tbl)
     /* loads file into buffer filtering it out */
     int a, prevchar = -1, i = 0, bracket = 0, quote = 1;
 
-    for (;;) {
-        a = getc(F);
-        if ((a == '\n') || (a == '\015')) a = ' ';
-        if (a == ',' && quote) a = ' ';
-        if (a == '\042') quote =! quote;
+    a = getc(F);
+    while (1) {
+        if (i >= BLOODY_BIG_BUFFER) {
+            AbEnd ("File too large for internal parsing buffer (%d bytes)",BLOODY_BIG_BUFFER);
+        }
+        if (((a == '\n') || (a == '\015')) ||
+            (a == ',' && quote)) {
+            a = ' ';
+        }
+        if (a == '\042') {
+            quote =! quote;
+        }
         if (quote) {
-            if ((a == '{') || (a == '(')) bracket++;
-            if ((a == '}') || (a == ')')) bracket--;
+            if ((a == '{') || (a == '(')) {
+                bracket++;
+            }
+            if ((a == '}') || (a == ')')) {
+                bracket--;
+            }
         }
         if (a == EOF) {
             tbl[i] = '\0';
-            xrealloc (tbl, i + 1);
+            tbl = xrealloc (tbl, i + 1);
             break;
         }
         if (IsSpace (a)) {
@@ -872,13 +886,18 @@ static char *filterInput (FILE *F, char *tbl)
             if (a == ';' && quote) {
                 do {
                     a = getc (F);
-                } while (a != '\n');
-                fseek (F, -1, SEEK_CUR);
+                } while (a != '\n' && a != EOF);
+                /* Don't discard this newline/EOF, continue to next loop.
+                ** A previous implementation used fseek(F,-1,SEEK_CUR),
+                ** which is invalid for text mode files, and was unreliable across platforms.
+                */
+                continue;
             } else {
                 tbl[i++] = a;
                 prevchar = a;
             }
         }
+        a = getc(F);
     }
 
     if (bracket != 0) AbEnd ("There are unclosed brackets!");

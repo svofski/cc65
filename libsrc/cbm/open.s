@@ -2,16 +2,11 @@
 ; Ullrich von Bassewitz, 16.11.2002
 ;
 ; int open (const char* name, int flags, ...);  /* May take a mode argument */
-;
-; Be sure to keep the value priority of closeallfiles lower than that of
-; closeallstreams (which is the high level C file I/O counterpart and must be
-; called before closeallfiles).
 
 
         .export         _open
         .destructor     closeallfiles, 5
 
-        .import         SETLFS, OPEN, CLOSE
         .import         addysp, popax
         .import         scratch, fnparse, fnaddmode, fncomplete, fnset
         .import         opencmdchannel, closecmdchannel, readdiskerror
@@ -22,6 +17,7 @@
         .include        "errno.inc"
         .include        "fcntl.inc"
         .include        "filedes.inc"
+        .include        "cbm.inc"
 
 
 ;--------------------------------------------------------------------------
@@ -98,10 +94,10 @@ parmok: jsr     popax           ; Get flags
 
         lda     #EINVAL
 
-; Error entry. Sets _errno, clears _oserror, returns -1
+; Error entry. Sets _errno, clears __oserror, returns -1
 
 seterrno:
-        jmp     __directerrno
+        jmp     ___directerrno
 
 ; Error entry: Close the file and exit. OS error code is in A on entry
 
@@ -117,7 +113,7 @@ closeandexit:
 
 ; Error entry: Set oserror and errno using error code in A and return -1
 
-oserror:jmp     __mappederrno
+oserror:jmp     ___mappederrno
 
 ; Read bit is set. Add an 'r' to the name
 
@@ -134,7 +130,7 @@ dowrite:
         beq     notrunc
         jsr     scratch
 
-; Complete the the file name. Check for append mode here.
+; Complete the file name. Check for append mode here.
 
 notrunc:
         lda     tmp3            ; Get the mode again
@@ -172,7 +168,7 @@ nofile:                         ; ... else use SA=0 (read)
         jsr     OPEN
         bcs     oserror
 
-; Open the the drive command channel and read it
+; Open the drive command channel and read it
 
         ldx     fnunit
         jsr     opencmdchannel
@@ -193,10 +189,8 @@ nofile:                         ; ... else use SA=0 (read)
 
         txa                     ; Handle
         ldx     #0
-        stx     __oserror       ; Clear _oserror
+        stx     ___oserror      ; Clear __oserror
         rts
 
 .endproc
 
-
-           

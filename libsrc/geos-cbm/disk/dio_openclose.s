@@ -1,8 +1,8 @@
 ;
-; Maciej 'YTM/Elysium' Witkowiak
+; 2001-07-02, Maciej 'YTM/Elysium' Witkowiak
+; 2015-08-24, Greg King
 ;
 ; based on Atari version by Christian Groessler
-; 2.7.2001
 ;
 ; dhandle_t     __fastcall__ dio_open  (unsigned char device);
 ; unsigned char __fastcall__ dio_close (dhandle_t handle);
@@ -11,7 +11,7 @@
 ; dio_close does nothing special
 
             .export _dio_open, _dio_close
-            .import __oserror, _OpenDisk
+            .import ___oserror, _OpenDisk
             .importzp ptr1, tmp1
 
             .include "dio.inc"
@@ -27,11 +27,13 @@ sectsizetab:
 .code
 
 _dio_open:
-        pha
+        cmp #4
+        bcs _inv_drive
         tax
         lda driveType,x         ; check if there's a device
         beq _inv_drive
         txa
+        pha
         clc
         adc #8                  ; normalize devnum
         sta curDevice
@@ -43,7 +45,7 @@ _dio_open:
         asl a                   ; make index from drive id
         asl a
         tax
-            
+
         lda #0
         sta sectsizetab+sst_sectsize,x
         lda #128
@@ -52,7 +54,7 @@ _dio_open:
         sta sectsizetab+sst_sectsize+1,x
         tya
         sta sectsizetab+sst_driveno,x
-            
+
         stx tmp1
         lda #<sectsizetab
         clc
@@ -67,7 +69,7 @@ _dio_open:
 
 _inv_drive:
         lda #DEV_NOT_FOUND
-        sta __oserror
+        sta ___oserror
         lda #0
         tax
         rts
@@ -78,6 +80,6 @@ _dio_close:
         lda #0
         ldy #sst_flag
         sta (ptr1),y
-        sta __oserror           ; success
+        sta ___oserror          ; success
         tax
         rts                     ; return no error

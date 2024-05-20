@@ -5,7 +5,7 @@
 ;
 
         .export         _getdevicedir
-        .import         popax, popa
+        .import         popptr1, popa
 
         .include        "zeropage.inc"
         .include        "errno.inc"
@@ -17,11 +17,10 @@ _getdevicedir:
         stx     ptr2+1
 
         ; Save buf
-        jsr     popax
-        sta     ptr1
-        stx     ptr1+1
+        jsr     popptr1
 
         ; Set buf
+        ldx     ptr1+1
         sta     mliparam + MLI::ON_LINE::DATA_BUFFER
         stx     mliparam + MLI::ON_LINE::DATA_BUFFER+1
 
@@ -46,9 +45,9 @@ _getdevicedir:
 
         ; Handle errors
 erange: lda     #<ERANGE
-        jsr     __directerrno
+        jsr     ___directerrno
         bne     :+              ; Branch always
-oserr:  jsr     __mappederrno
+oserr:  jsr     ___mappederrno
 :       lda     #$00            ; Return NULL
         tax
         rts
@@ -64,7 +63,7 @@ oserr:  jsr     __mappederrno
         lda     (ptr1),y
         and     #15             ; Max volume name length
         sta     tmp1
-        
+
         ; Add leading slash
         lda     #'/'
         sta     (ptr1),y
@@ -74,7 +73,7 @@ oserr:  jsr     __mappederrno
         iny
         lda     #$00
         sta     (ptr1),y
-        sta     __oserror       ; Clear _oserror
+        sta     ___oserror      ; Clear __oserror
 
         ; Success, return buf
         lda     ptr1

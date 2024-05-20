@@ -96,7 +96,7 @@ void OpenOutput (const char* Name)
     if (Name != 0) {
         F = fopen (Name, "w");
         if (F == 0) {
-            Error ("Cannot open `%s': %s", Name, strerror (errno));
+            Error ("Cannot open '%s': %s", Name, strerror (errno));
         }
     } else {
         F = stdout;
@@ -399,5 +399,25 @@ void OutputSettings (void)
     Indent (ACol);
     Output ("\"%s\"", CPUNames[CPU]);
     LineFeed ();
+    LineFeed ();
+}
+
+
+
+void OutputMFlag (unsigned char enabled)
+/* Output the 65816 M-flag state */
+{
+    Indent (MCol);
+    Output (enabled ? ".a8" : ".a16");
+    LineFeed ();
+}
+
+
+
+void OutputXFlag (unsigned char enabled)
+/* Output the 65816 X-flag state */
+{
+    Indent (MCol);
+    Output (enabled ? ".i8" : ".i16");
     LineFeed ();
 }

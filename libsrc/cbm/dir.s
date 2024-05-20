@@ -7,7 +7,7 @@
         .include        "dir.inc"
         .include        "errno.inc"
         .include        "zeropage.inc"
-                             
+
         .import         pushax
         .import         _read
 
@@ -92,8 +92,8 @@ L3:     sta     tmp1            ; Save returned count
 ; Didn't read enough bytes. This is an error for us, but errno is not set
 
         lda     #<EIO
-        sta     __errno
-        stx     __errno+1       ; X is zero
+        sta     ___errno
+        stx     ___errno+1      ; X is zero
         bne     L1              ; Branch always
 
 

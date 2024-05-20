@@ -47,7 +47,8 @@
 /* Supported CPUs */
 typedef enum CPUType {
     CPU_6502,
-    CPU_65C02
+    CPU_65C02,
+    CPU_6502X
 } CPUType;
 
 /* Current CPU */
@@ -95,10 +96,6 @@ unsigned ExecuteInsn (void);
 /* Execute one CPU instruction. Return the number of clock cycles for the
 ** executed instruction.
 */
-
-unsigned long GetCycles (void);
-/* Return the total number of clock cycles executed */
-
 
 
 /* End of 6502.h */

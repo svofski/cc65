@@ -46,7 +46,7 @@
 
 
 /* THE memory */
-static unsigned char Mem[0x10000];
+unsigned char Mem[0x10000];
 
 
 
@@ -64,10 +64,11 @@ void MemWriteByte (unsigned Addr, unsigned char Val)
 
 
 
-unsigned char MemReadByte (unsigned Addr)
-/* Read a byte from a memory location */
+void MemWriteWord (unsigned Addr, unsigned Val)
+/* Write a word to a memory location */
 {
-    return Mem[Addr];
+    MemWriteByte (Addr, Val & 0xFF);
+    MemWriteByte (Addr + 1, Val >> 8);
 }
 
 
@@ -82,7 +83,7 @@ unsigned MemReadWord (unsigned Addr)
 
 
 unsigned MemReadZPWord (unsigned char Addr)
-/* Read a word from the zero page. This function differs from ReadMemW in that
+/* Read a word from the zero page. This function differs from MemReadWord in that
 ** the read will always be in the zero page, even in case of an address
 ** overflow.
 */
@@ -96,10 +97,6 @@ unsigned MemReadZPWord (unsigned char Addr)
 void MemInit (void)
 /* Initialize the memory subsystem */
 {
-    /* Fill momory with illegal opcode */
+    /* Fill memory with illegal opcode */
     memset (Mem, 0xFF, sizeof (Mem));
-
-    /* Set RESET vector to 0x0200 */
-    Mem[0xFFFC] = 0x00;
-    Mem[0xFFFD] = 0x02;
 }

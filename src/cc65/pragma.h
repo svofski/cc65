@@ -6,10 +6,10 @@
 /*                                                                           */
 /*                                                                           */
 /*                                                                           */
-/* (C) 1998-2002 Ullrich von Bassewitz                                       */
-/*               Wacholderweg 14                                             */
-/*               D-70597 Stuttgart                                           */
-/* EMail:        uz@cc65.org                                                 */
+/* (C) 1998-2002, Ullrich von Bassewitz                                      */
+/*                Roemerstrasse 52                                           */
+/*                D-70794 Filderstadt                                        */
+/* EMail:         uz@cc65.org                                                */
 /*                                                                           */
 /*                                                                           */
 /* This software is provided 'as-is', without any expressed or implied       */
@@ -44,8 +44,10 @@
 
 
 
-void DoPragma (void);
-/* Handle pragmas. These come always in form of the new C99 _Pragma() operator. */
+void ConsumePragma (void);
+/* Parse a pragma. The pragma comes always in the form of the new C99 _Pragma()
+** operator.
+*/
 
 
 

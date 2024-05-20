@@ -1,14 +1,14 @@
 ;
 ; Ullrich von Bassewitz, 17.05.2000
 ;
-; int __fastcall__ _osmaperrno (unsigned char oserror);
+; int __fastcall__ __osmaperrno (unsigned char oserror);
 ;
 
-        .export         __osmaperrno
+        .export         ___osmaperrno
 
         .include        "errno.inc"
 
-__osmaperrno:
+___osmaperrno:
         ldx     #ErrTabSize
 :       cmp     ErrTab-2,x      ; Search for the error code
         beq     :+              ; Jump if found
@@ -45,7 +45,7 @@ ErrTab: .byte   $01, ENOSYS     ; Bad system call number
         .byte   $47, EEXIST     ; Duplicate filename
         .byte   $48, ENOSPC     ; Volume full
         .byte   $49, ENOSPC     ; Volume directory full
-;       .byte   $4A, EUNKNOWN   ; Incompatible file format
+        .byte   $4A, ENOEXEC    ; Incompatible file format
         .byte   $4B, EINVAL     ; Unsupported storage_type
 ;       .byte   $4C, EUNKNOWN   ; End of file encountered
         .byte   $4D, ESPIPE     ; Position out of range

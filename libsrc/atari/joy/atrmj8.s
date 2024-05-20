@@ -35,24 +35,12 @@
 
         .addr   $0000
 
-; Button state masks (8 values)
-
-        .byte   $02                     ; JOY_UP
-        .byte   $04                     ; JOY_DOWN
-        .byte   $08                     ; JOY_LEFT
-        .byte   $10                     ; JOY_RIGHT
-        .byte   $01                     ; JOY_FIRE
-        .byte   $00                     ; JOY_FIRE2 not available
-        .byte   $00                     ; Future expansion
-        .byte   $00                     ; Future expansion
-
 ; Jump table.
 
         .addr   INSTALL
         .addr   UNINSTALL
         .addr   COUNT
         .addr   READJOY
-        .addr   0                       ; IRQ entry not used
 
 ; ------------------------------------------------------------------------
 ; Constants
@@ -81,7 +69,8 @@ INSTALL:
         lda     #$34
         sta     PACTL
         lda     #JOY_ERR_OK
-        ldx     #0
+        .assert JOY_ERR_OK = 0, error
+        tax
 ;       rts                     ; Run into UNINSTALL instead
 
 ; ------------------------------------------------------------------------
@@ -107,6 +96,8 @@ COUNT:
 ;
 
 READJOY:
+        and     #JOY_COUNT-1    ; fix joystick number
+        tax                     ; Joystick number into X
         asl     a
         asl     a
         asl     a
@@ -115,10 +106,21 @@ READJOY:
 
 ; Read joystick
 
-        lda     PORTA           ; get position
-        and     #%00001111
+        lda     STRIG0          ; get button
         asl     a
-        ora     TRIG0           ; add button information
-        eor     #%00011111
-        ldx     #0              ; fix X
+        asl     a
+        asl     a
+        asl     a
+        ora     PORTA           ; add position information
+        eor     #$1F
+        cmp     oldval,x
+        beq     :+
+        sta     oldval,x
+        ldx     #0
+        stx     ATRACT          ; we have interaction, disable "attract mode"
+:       ldx     #0              ; fix X
         rts
+
+        .bss
+
+oldval: .res    JOY_COUNT

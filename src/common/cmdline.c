@@ -181,6 +181,17 @@ void InitCmdLine (int* aArgCount, char*** aArgVec, const char* aProgName)
             /* Use the default */
             ProgName = aProgName;
         }
+        else {
+            /* remove .exe extension, if there is any
+            **
+            ** Note: This creates a new string that is
+            ** never free()d.
+            ** As this is exactly only string, and it
+            ** lives for the whole lifetime of the tool,
+            ** this is not an issue.
+            */
+            ProgName = MakeFilename (ProgName, "");
+        }
     }
 
     /* Make a CmdLine struct */
@@ -239,7 +250,7 @@ void NeedArg (const char* Opt)
 void InvArg (const char* Opt, const char* Arg)
 /* Print an error about an invalid option argument and exit. */
 {
-    AbEnd ("Invalid argument for %s: `%s'", Opt, Arg);
+    AbEnd ("Invalid argument for %s: '%s'", Opt, Arg);
 }
 
 
@@ -247,7 +258,7 @@ void InvArg (const char* Opt, const char* Arg)
 void InvDef (const char* Def)
 /* Print an error about an invalid definition and die */
 {
-    AbEnd ("Invalid definition: `%s'", Def);
+    AbEnd ("Invalid definition: '%s'", Def);
 }
 
 

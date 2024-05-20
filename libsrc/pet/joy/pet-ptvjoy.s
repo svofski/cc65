@@ -10,6 +10,7 @@
 
         .include "joy-kernel.inc"
         .include "joy-error.inc"
+        .include "pet.inc"
 
         .macpack module
 
@@ -28,33 +29,17 @@
 
         .addr   $0000
 
-; Button state masks (8 values)
-
-        .byte   $01                     ; JOY_UP
-        .byte   $02                     ; JOY_DOWN
-        .byte   $04                     ; JOY_LEFT
-        .byte   $08                     ; JOY_RIGHT
-        .byte   $10                     ; JOY_FIRE
-        .byte   $00                     ; JOY_FIRE2 unavailable
-        .byte   $00                     ; Future expansion
-        .byte   $00                     ; Future expansion
-
 ; Jump table.
 
         .addr   INSTALL
         .addr   UNINSTALL
         .addr   COUNT
         .addr   READ
-        .addr   0                       ; IRQ entry unused
 
 ; ------------------------------------------------------------------------
 ; Constants
 
 JOY_COUNT       = 2                     ; Number of joysticks we support
-
-VIA_PRA         := $E841                ; Port register A
-VIA_DDRA        := $E843                ; Data direction register A
-
 
 .code
 
@@ -66,8 +51,9 @@ VIA_DDRA        := $E843                ; Data direction register A
 ;
 
 INSTALL:
-        lda     #<JOY_ERR_OK
-        ldx     #>JOY_ERR_OK
+        lda     #JOY_ERR_OK
+        .assert JOY_ERR_OK = 0, error
+        tax
 ;       rts                     ; Run into UNINSTALL instead
 
 ; ------------------------------------------------------------------------
@@ -101,9 +87,9 @@ READ:   lda     #%10000000      ; via port A Data-Direction
 ; Read joystick 1
 
 joy1:   lda     #$80            ; via port A read/write
-        sta     VIA_PRA         ; (output one at PA7)
+        sta     VIA_PA1         ; (output one at PA7)
 
-        lda     VIA_PRA         ; via port A read/write
+        lda     VIA_PA1         ; via port A read/write
         and     #$1f            ; get bit 4-0 (PA4-PA0)
         eor     #$1f
         rts
@@ -111,13 +97,13 @@ joy1:   lda     #$80            ; via port A read/write
 ; Read joystick 2
 
 joy2:   lda     #$00            ; via port A read/write
-        sta     VIA_PRA         ; (output zero at PA7)
+        sta     VIA_PA1         ; (output zero at PA7)
 
-        lda     VIA_PRA         ; via port A read/write
+        lda     VIA_PA1         ; via port A read/write
         and     #$0f            ; get bit 3-0 (PA3-PA0)
         sta     tmp1            ; joy 4 directions
 
-        lda     VIA_PRA         ; via port A read/write
+        lda     VIA_PA1         ; via port A read/write
         and     #%00100000      ; get bit 5 (PA5)
         lsr
         ora     tmp1

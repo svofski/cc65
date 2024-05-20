@@ -1,6 +1,6 @@
 /*****************************************************************************/
 /*                                                                           */
-/*                                  main.c                                   */
+/*                              main.c                                       */
 /*                                                                           */
 /*            Main program of the sp65 sprite and bitmap utility             */
 /*                                                                           */
@@ -47,6 +47,7 @@
 /* sp65 */
 #include "attr.h"
 #include "convert.h"
+#include "palconv.h"
 #include "error.h"
 #include "input.h"
 #include "output.h"
@@ -68,10 +69,13 @@ static Bitmap* C;
 /* Output data from convertion */
 static StrBuf* D;
 
+/* Output data from palconv */
+static StrBuf* E;
+
 
 
 /*****************************************************************************/
-/*                                   Code                                    */
+/*                                                             Code                                       */
 /*****************************************************************************/
 
 
@@ -88,6 +92,7 @@ static void Usage (void)
             "  -lc\t\t\t\tList all possible conversions\n"
             "  -r file[,attrlist]\t\tRead an input file\n"
             "  -v\t\t\t\tIncrease verbosity\n"
+            "  -p tgt,file[,attrlist]\t\tWrite the palette to a file\n"
             "  -w file[,attrlist]\t\tWrite the output to a file\n"
             "\n"
             "Long options:\n"
@@ -99,6 +104,7 @@ static void Usage (void)
             "  --slice x,y,w,h\t\tGenerate a slice from the loaded bitmap\n"
             "  --verbose\t\t\tIncrease verbosity\n"
             "  --version\t\t\tPrint the version number and exit\n"
+            "  --palette tgt,file[,attrlist]\tWrite the palette to a file\n"
             "  --write file[,attrlist]\tWrite the output to a file\n",
             ProgName);
 }
@@ -136,11 +142,26 @@ static void SetOutputData (StrBuf* N)
 }
 
 
+static void SetPalOutputData (StrBuf* N)
+/* Delete the old output data and replace it by the given one. The new one
+** may be NULL to clear it.
+*/
+{
+    /* Delete the old output data */
+    if (E != 0) {
+        FreeStrBuf (E);
+    }
+
+    /* Set the new one */
+    E = N;
+}
+
+
 
 static void OptConvertTo (const char* Opt attribute ((unused)), const char* Arg)
 /* Convert the bitmap into a target format */
 {
-    static const char* NameList[] = {
+    static const char* const NameList[] = {
         "format"
     };
 
@@ -219,7 +240,7 @@ static void OptPop (const char* Opt attribute ((unused)),
 static void OptRead (const char* Opt attribute ((unused)), const char* Arg)
 /* Read an input file */
 {
-    static const char* NameList[] = {
+    static const char* const NameList[] = {
         "name", "format"
     };
 
@@ -273,7 +294,7 @@ static void OptSlice (const char* Opt attribute ((unused)), const char* Arg)
 
 static void OptVerbose (const char* Opt attribute ((unused)),
                         const char* Arg attribute ((unused)))
-/* Increase versbosity */
+/* Increase verbosity */
 {
     ++Verbosity;
 }
@@ -281,7 +302,7 @@ static void OptVerbose (const char* Opt attribute ((unused)),
 
 
 static void OptVersion (const char* Opt attribute ((unused)),
-                        const char* Arg attribute ((unused)))
+                          const char* Arg attribute ((unused)))
 /* Print the assembler version */
 {
     fprintf (stderr, "%s V%s\n", ProgName, GetVersionAsString ());
@@ -289,10 +310,41 @@ static void OptVersion (const char* Opt attribute ((unused)),
 
 
 
+static void OptPalette (const char* Opt attribute ((unused)), const char* Arg)
+/* Write an output file */
+{
+    static const char* const NameList[] = {
+        "target", "name", "format"
+    };
+
+
+    /* Parse the argument */
+    Collection* A = ParseAttrList (Arg, NameList, 2);
+
+    /* We must have a bitmap ... */
+    if (C == 0) {
+        Error ("No bitmap");
+    }
+
+    /* ... which must be indexed */
+    if (!BitmapIsIndexed (C)) {
+        Error ("Current bitmap is not indexed");
+    }
+
+    /* Convert the palette */
+    SetPalOutputData (PaletteTo (C, A));
+
+    /* Write the file */
+    WriteOutputFile (E, A, C);
+
+    /* Delete the attribute list */
+    FreeAttrList (A);
+}
+
 static void OptWrite (const char* Opt attribute ((unused)), const char* Arg)
 /* Write an output file */
 {
-    static const char* NameList[] = {
+    static const char* const NameList[] = {
         "name", "format"
     };
 
@@ -379,6 +431,10 @@ int main (int argc, char* argv [])
                     OptVerbose (Arg, 0);
                     break;
 
+                case 'p':
+                    OptPalette (Arg, GetArg (&I, 2));
+                    break;
+
                 case 'w':
                     OptWrite (Arg, GetArg (&I, 2));
                     break;
@@ -390,11 +446,16 @@ int main (int argc, char* argv [])
             }
         } else {
             /* We don't accept anything else */
-            AbEnd ("Don't know what to do with `%s'", Arg);
+            AbEnd ("Don't know what to do with '%s'", Arg);
         }
 
         /* Next argument */
         ++I;
+    }
+
+    /* Do we have an input file? */
+    if (I == 1) {
+        Error ("No input file");
     }
 
     /* Cleanup data */

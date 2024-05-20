@@ -60,8 +60,23 @@
 /* Name of program file */
 const char* ProgramFile;
 
-/* exit simulator after MaxCycles Cycles */
-unsigned long MaxCycles = 0;
+/* count of total cycles executed */
+unsigned long long TotalCycles = 0;
+
+/* exit simulator after MaxCycles Cccles */
+unsigned long long MaxCycles = 0;
+
+/* countdown from MaxCycles */
+unsigned long long RemainCycles;
+
+/* Header signature 'sim65' */
+static const unsigned char HeaderSignature[] = {
+    0x73, 0x69, 0x6D, 0x36, 0x35
+};
+#define HEADER_SIGNATURE_LENGTH (sizeof(HeaderSignature)/sizeof(HeaderSignature[0]))
+
+static const unsigned char HeaderVersion = 2;
+
 
 /*****************************************************************************/
 /*                                   Code                                    */
@@ -74,12 +89,14 @@ static void Usage (void)
     printf ("Usage: %s [options] file [arguments]\n"
             "Short options:\n"
             "  -h\t\t\tHelp (this text)\n"
+            "  -c\t\t\tPrint amount of executed CPU cycles\n"
             "  -v\t\t\tIncrease verbosity\n"
             "  -V\t\t\tPrint the simulator version number\n"
             "  -x <num>\t\tExit simulator after <num> cycles\n"
             "\n"
             "Long options:\n"
             "  --help\t\tHelp (this text)\n"
+            "  --cycles\t\tPrint amount of executed CPU cycles\n"
             "  --verbose\t\tIncrease verbosity\n"
             "  --version\t\tPrint the simulator version number\n",
             ProgName);
@@ -106,57 +123,115 @@ static void OptVerbose (const char* Opt attribute ((unused)),
 
 
 
+static void OptCycles (const char* Opt attribute ((unused)),
+                       const char* Arg attribute ((unused)))
+/* Set flag to print amount of cycles at the end */
+{
+    PrintCycles = 1;
+}
+
+
+
 static void OptVersion (const char* Opt attribute ((unused)),
                         const char* Arg attribute ((unused)))
 /* Print the simulator version */
 {
-    fprintf (stderr, "sim65 V%s\n", GetVersionAsString ());
+    fprintf (stderr, "%s V%s\n", ProgName, GetVersionAsString ());
+    exit(EXIT_SUCCESS);
 }
 
 static void OptQuitXIns (const char* Opt attribute ((unused)),
                         const char* Arg attribute ((unused)))
 /* quit after MaxCycles cycles */
 {
-    MaxCycles = strtoul(Arg, NULL, 0);
+    MaxCycles = strtoull(Arg, NULL, 0);
 }
 
-static void ReadProgramFile (void)
+static unsigned char ReadProgramFile (void)
 /* Load program into memory */
 {
-    int Val;
-    unsigned Addr = 0x0200;
+    unsigned I;
+    int Val, Val2;
+    int Version;
+    unsigned Addr;
+    unsigned Load, Reset;
+    unsigned char SPAddr = 0x00;
 
     /* Open the file */
     FILE* F = fopen (ProgramFile, "rb");
     if (F == 0) {
-        Error ("Cannot open `%s': %s", ProgramFile, strerror (errno));
+        Error ("Cannot open '%s': %s", ProgramFile, strerror (errno));
+    }
+
+    /* Verify the header signature */
+    for (I = 0; I < HEADER_SIGNATURE_LENGTH; ++I) {
+        if ((Val = fgetc(F)) != HeaderSignature[I]) {
+            Error ("'%s': Invalid header signature.", ProgramFile);
+        }
+    }
+
+    /* Get header version */
+    if ((Version = fgetc(F)) != HeaderVersion) {
+        Error ("'%s': Invalid header version.", ProgramFile);
     }
 
     /* Get the CPU type from the file header */
     if ((Val = fgetc(F)) != EOF) {
-        if (Val != CPU_6502 && Val != CPU_65C02) {
-            Error ("`%s': Invalid CPU type", ProgramFile);
+        switch (Val) {
+        case CPU_6502:
+        case CPU_65C02:
+        case CPU_6502X:
+            CPU = Val;
+            break;
+
+        default:
+            Error ("'%s': Invalid CPU type", ProgramFile);
         }
-        CPU = Val;
     }
 
+    /* Get the address of sp from the file header */
+    if ((Val = fgetc(F)) != EOF) {
+        SPAddr = Val;
+    }
+
+    /* Get load address */
+    Val2 = 0; /* suppress uninitialized variable warning */
+    if (((Val = fgetc(F)) == EOF) ||
+        ((Val2 = fgetc(F)) == EOF)) {
+        Error ("'%s': Header missing load address", ProgramFile);
+    }
+    Load = Val | (Val2 << 8);
+
+    /* Get reset address */
+    if (((Val = fgetc(F)) == EOF) ||
+        ((Val2 = fgetc(F)) == EOF)) {
+        Error ("'%s': Header missing reset address", ProgramFile);
+    }
+    Reset = Val | (Val2 << 8);
+
     /* Read the file body into memory */
+    Addr = Load;
     while ((Val = fgetc(F)) != EOF) {
-        if (Addr == 0xFF00) {
-            Error ("`%s': To large to fit into $0200-$FFF0", ProgramFile);
+        if (Addr >= PARAVIRT_BASE) {
+            Error ("'%s': To large to fit into $%04X-$%04X", ProgramFile, Addr, PARAVIRT_BASE);
         }
         MemWriteByte (Addr++, (unsigned char) Val);
     }
 
     /* Check for errors */
     if (ferror (F)) {
-        Error ("Error reading from `%s': %s", ProgramFile, strerror (errno));
+        Error ("Error reading from '%s': %s", ProgramFile, strerror (errno));
     }
 
     /* Close the file */
     fclose (F);
 
-    Print (stderr, 1, "Loaded `%s' at $0200-$%04X\n", ProgramFile, Addr - 1);
+    Print (stderr, 1, "Loaded '%s' at $%04X-$%04X\n", ProgramFile, Load, Addr - 1);
+    Print (stderr, 1, "File version: %d\n", Version);
+    Print (stderr, 1, "Reset: $%04X\n", Reset);
+
+    MemWriteWord(0xFFFC, Reset);
+    return SPAddr;
 }
 
 
@@ -166,11 +241,14 @@ int main (int argc, char* argv[])
     /* Program long options */
     static const LongOpt OptTab[] = {
         { "--help",             0,      OptHelp                 },
+        { "--cycles",           0,      OptCycles               },
         { "--verbose",          0,      OptVerbose              },
         { "--version",          0,      OptVersion              },
     };
 
     unsigned I;
+    unsigned char SPAddr;
+    unsigned int Cycles;
 
     /* Initialize the cmdline module */
     InitCmdLine (&argc, &argv, "sim65");
@@ -194,6 +272,10 @@ int main (int argc, char* argv[])
                 case 'h':
                 case '?':
                     OptHelp (Arg, 0);
+                    break;
+
+                case 'c':
+                    OptCycles (Arg, 0);
                     break;
 
                 case 'v':
@@ -226,23 +308,27 @@ int main (int argc, char* argv[])
         AbEnd ("No program file");
     }
 
-    ParaVirtInit (I);
-
     MemInit ();
 
-    ReadProgramFile ();
+    SPAddr = ReadProgramFile ();
+    ParaVirtInit (I, SPAddr);
 
     Reset ();
 
+    RemainCycles = MaxCycles;
     while (1) {
-        ExecuteInsn ();
-        if (MaxCycles && (GetCycles () >= MaxCycles)) {
-            Error ("Maximum number of cycles reached.");
-            exit (-99); /* do not use EXIT_FAILURE to avoid conflicts with the
-                           same value being used in a test program */
+        Cycles = ExecuteInsn ();
+        TotalCycles += Cycles;
+        if (MaxCycles) {
+            if (Cycles > RemainCycles) {
+                ErrorCode (SIM65_ERROR_TIMEOUT, "Maximum number of cycles reached.");
+            }
+            RemainCycles -= Cycles;
         }
     }
 
-    /* Return an apropriate exit code */
-    return EXIT_SUCCESS;
+    /* Unreachable. sim65 program must exit through paravirtual PVExit
+    ** or timeout from MaxCycles producing an error.
+    */
+    return SIM65_ERROR;
 }

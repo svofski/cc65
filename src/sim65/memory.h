@@ -36,7 +36,9 @@
 #ifndef MEMORY_H
 #define MEMORY_H
 
+#include "inline.h"
 
+extern unsigned char Mem[0x10000];
 
 /*****************************************************************************/
 /*                                   Code                                    */
@@ -47,14 +49,24 @@
 void MemWriteByte (unsigned Addr, unsigned char Val);
 /* Write a byte to a memory location */
 
-unsigned char MemReadByte (unsigned Addr);
+void MemWriteWord (unsigned Addr, unsigned Val);
+/* Write a word to a memory location */
+
+#if defined(HAVE_INLINE)
+INLINE unsigned char MemReadByte (unsigned Addr)
 /* Read a byte from a memory location */
+{
+    return Mem[Addr];
+}
+#else
+#define MemReadByte(Addr) Mem[Addr]
+#endif
 
 unsigned MemReadWord (unsigned Addr);
 /* Read a word from a memory location */
 
 unsigned MemReadZPWord (unsigned char Addr);
-/* Read a word from the zero page. This function differs from ReadMemW in that
+/* Read a word from the zero page. This function differs from MemReadWord in that
 ** the read will always be in the zero page, even in case of an address
 ** overflow.
 */

@@ -6,7 +6,6 @@
 
         .export         _close
 
-        .import         CLOSE
         .import         readdiskerror, closecmdchannel
         .importzp       tmp2
 
@@ -17,7 +16,7 @@
 
 ;--------------------------------------------------------------------------
 ; _close
-                                                   
+
 .proc   _close
 
 ; Check if we have a valid handle
@@ -40,7 +39,7 @@
 
         lda     #LFN_CLOSED
         sta     fdtab,x
-        lda     tmp2            ; Get the handle
+        txa                     ; Get handle
         clc
         adc     #LFN_OFFS       ; Make LFN from handle
         jsr     CLOSE
@@ -55,16 +54,12 @@
         ldx     unittab,y
         jsr     closecmdchannel ; Close the disk command channel
         pla                     ; Get the error code from the disk
-        jmp     __mappederrno   ; Set _oserror and _errno, return 0/-1
+        jmp     ___mappederrno  ; Set __oserror and _errno, return 0/-1
 
 ; Error entry: The given file descriptor is not valid or not open
 
 invalidfd:
         lda     #EBADF
-        jmp     __directerrno   ; Set _errno, clear _oserror, return -1
+        jmp     ___directerrno  ; Set _errno, clear __oserror, return -1
 
 .endproc
-
-
-
-

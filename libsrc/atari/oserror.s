@@ -2,13 +2,13 @@
 ; Christian Groessler, May-2000
 ;
 ; os specific error code mapping
-; int __fastcall__ _osmaperrno (unsigned char oserror);
+; int __fastcall__ __osmaperrno (unsigned char oserror);
 ;
 
         .include "errno.inc"
-        .export __osmaperrno
+        .export ___osmaperrno
 
-.proc   __osmaperrno
+.proc   ___osmaperrno
 
         cmp     #$80            ; error or success
         bcs     errcode         ; error, jump
@@ -95,7 +95,7 @@ maptable:
         .byte   EUNKNOWN        ; 177 - haven't found documentation
         .byte   EUNKNOWN        ; 178 - haven't found documentation
         .byte   EUNKNOWN        ; 179 - haven't found documentation
-        .byte   EUNKNOWN        ; 180 - not a binary file
+        .byte   ENOEXEC         ; 180 - not a binary file
         .byte   EUNKNOWN        ; 181 - [MYDOS] invalid address range
         .byte   EUNKNOWN        ; 182 - [XDOS] invalid parameter
 

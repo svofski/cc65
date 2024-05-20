@@ -7,7 +7,7 @@
 /*                                                                           */
 /*                                                                           */
 /* (C) 2013-2013 Ullrich von Bassewitz                                       */
-/*               Römerstrasse 52                                             */
+/*               Roemerstrasse 52                                            */
 /*               D-70794 Filderstadt                                         */
 /* EMail:        uz@cc65.org                                                 */
 /*                                                                           */
@@ -39,12 +39,26 @@
 
 
 /*****************************************************************************/
+/*                                   Data                                    */
+/*****************************************************************************/
+
+
+
+#define PARAVIRT_BASE        0xFFF2
+/* Lowest address used by a paravirtualization hook */
+
+#define PV_PATH_SIZE         1024
+/* Maximum path size supported by PVOpen/PVSysRemove */
+
+
+
+/*****************************************************************************/
 /*                                   Code                                    */
 /*****************************************************************************/
 
 
 
-void ParaVirtInit (unsigned aArgStart);
+void ParaVirtInit (unsigned aArgStart, unsigned char aSPAddr);
 /* Initialize the paravirtualization subsystem */
 
 void ParaVirtHooks (CPURegs* Regs);

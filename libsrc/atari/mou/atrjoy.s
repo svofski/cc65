@@ -89,6 +89,8 @@ YMin:           .res    2               ; Y1 value of bounding box
 XMax:           .res    2               ; X2 value of bounding box
 YMax:           .res    2               ; Y2 value of bounding box
 Buttons:        .res    1               ; Button mask
+OldDir:         .res    1               ; previous direction bits
+OldButton:      .res    1               ; previous buttons
 
 
 Temp:           .res    1               ; Temporary value used in the int handler
@@ -135,9 +137,10 @@ INSTALL:
         ldx     YPos+1
         jsr     CMOVEY
 
-; Done, return zero (= MOUSE_ERR_OK)
+; Done
 
-        ldx     #$00
+        ldx     #MOUSE_ERR_OK
+        .assert MOUSE_ERR_OK = 0, error
         txa
         rts
 
@@ -336,9 +339,24 @@ IRQ:
 
         jsr     CPREP
 
+; Check if user activity occurred, and if yes, disable "attract mode"
+
+        lda     Buttons
+        cmp     OldButton
+        beq     @ChkDir
+        sta     OldButton
+        lda     #0
+        sta     ATRACT                  ; disable "attract mode"
+@ChkDir:lda     Temp
+        cmp     OldDir
+        beq     @ChkCnt
+        sta     OldDir
+        lda     #0
+        sta     ATRACT
+
 ; Check left/right
 
-        lda     Temp                    ; Read joystick #0
+@ChkCnt:lda     Temp                    ; Read joystick #0
         and     #(JOY::LEFT | JOY::RIGHT)
         beq     @SkipX                  ;
 
@@ -437,4 +455,3 @@ IRQ:
 @SkipY: jsr     CDRAW
         clc                             ; Interrupt not "handled"
         rts
-
